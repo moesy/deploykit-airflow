@@ -11,6 +11,7 @@ env:
 	$(VIRTUALENV) env/ --no-site-packages
 
 install: clean env
+	. env/bin/activate; easy_install -U setuptools
 	. env/bin/activate; pip install -r requirements.txt
 
 
@@ -21,5 +22,4 @@ launch: env shutdown
 	. env/bin/activate; airflow webserver
 
 shutdown:
-	ps gx | grep 'airflow'
 	ps -ef | grep "gunicorn" | grep -v grep | awk '{print $$2}' | xargs kill

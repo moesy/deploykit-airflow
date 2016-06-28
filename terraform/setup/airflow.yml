@@ -1,0 +1,69 @@
+---
+- hosts: all
+
+  tasks:
+  - name: Install core packages
+    become: yes
+    apt: pkg={{ item }} state=installed update_cache=yes
+    with_items:
+      # Database
+      # - redis-server
+
+      # The Basics
+      - build-essential
+      - libssl-dev
+      - libffi-dev
+      - git
+      - git-core
+      - zsh
+      - make
+      # Python
+      - python-dev
+      - python-virtualenv
+      - libevent-dev
+      - libpq-dev
+      - libffi-dev
+      - python-setuptools
+      - supervisor
+
+  - name: oh-my-zsh | Clone down repository
+    git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=/home/{{ansible_ssh_user}}/.oh-my-zsh
+
+  - name: oh-my-zsh | Set zsh as default shell
+    user: name={{ansible_ssh_user}} shell=/bin/zsh
+    become: yes
+
+  - name: Upload .zshrc settings
+    copy: src=dotenv/.zshrc dest=/home/{{ansible_ssh_user}}/.zshrc backup=yes force=yes owner={{ansible_ssh_user}} group=www-data
+
+
+- hosts: all
+  gather_facts: no
+  vars:
+    AIRFLOW_PATH: /home/ubuntu/airflow
+    AIRFLOW_ENV: "{{AIRFLOW_PATH}}/env"
+
+  tasks:
+  - name: Upload config/
+    copy: src=config/ dest={{AIRFLOW_PATH}}/ force=yes owner={{ansible_ssh_user}} group=www-data
+
+  - name: Prepare setuptools
+    easy_install: name=setuptools virtualenv={{AIRFLOW_ENV}} state=latest
+
+  - name: Install python dependencies (normal)
+    pip: requirements="{{AIRFLOW_PATH}}/requirements.txt" virtualenv={{AIRFLOW_ENV}}
+
+  - name: Upload dameon config files
+    copy: src=upstart/conf.d/ dest=/etc/supervisor/conf.d/
+
+  - name: Upload launch scripts
+    copy: src=upstart/scripts/ dest=/usr/local/bin/ owner={{ansible_ssh_user}} group=www-data
+
+  - name: Reboot Supervisor
+    command: service supervisor restart
+
+  - name: Reload install scripts
+    command: supervisorctl reread
+
+  - name: Reload supervisorctl
+    command: supervisorctl update
